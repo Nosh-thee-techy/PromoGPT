@@ -1,11 +1,13 @@
-import React, { useState, useEffect, createContext, useContext } from 'react';
-import axios from 'axios';
+import React, { useContext } from 'react';
+import { AuthContext } from './AuthContext.jsx';
+import LoginForm from './components/LoginForm.jsx';
+import Products from './components/Products.jsx';
+import CSVUpload from './components/CSVUpload.jsx';
 
 // Setup backend base URL - update to your backend URL or env variable
 const API_BASE = 'http://localhost:8000';
 
 // Auth Context to manage login state & tokens
-const AuthContext = createContext();
 
 const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -123,8 +125,7 @@ const CSVUpload = ({ businessSlug }) => {
 // Main App component
 export default function App() {
   const { user, logout } = useContext(AuthContext);
-  // Replace with actual business slug management from your data
-  const businessSlug = 'demo-business'; 
+  const businessSlug = 'demo-business'; // Change based on your data
 
   return (
     <div style={{ padding: 20 }}>
@@ -141,5 +142,5 @@ export default function App() {
     </div>
   );
 }
-
+  
 // Wrap app with AuthProvider in entrypoint (index.jsx)
