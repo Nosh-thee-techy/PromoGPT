@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Product,SalesRecord
+from .models import Product, SalesRecord
 
 class Productserializer(serializers.ModelSerializer):
     class Meta:
@@ -7,12 +7,13 @@ class Productserializer(serializers.ModelSerializer):
         fields = "__all__"
         read_only_fields = ("id", "business", "created_at")
 
-class ProductCSVUploadSerializer(serializers.serializer):
-    file=serializers.FileField()
-
-
+# FIX: Changed from serializers.serializer to serializers.Serializer
+class ProductCSVUploadSerializer(serializers.Serializer):
+    file = serializers.FileField()
 
 class SalesRecordSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source='product.name', read_only=True)
+    
     class Meta:
         model = SalesRecord
         fields = "__all__"

@@ -3,11 +3,66 @@ import axios from 'axios';
 
 const API_BASE = 'http://localhost:8000';
 
+// Configure axios defaults
+axios.defaults.baseURL = API_BASE;
+
 // Auth Context
 const AuthContext = createContext(null);
 
-// Onboarding/Welcome Page
-const WelcomePage = ({ onGetStarted }) => {
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within AuthProvider');
+  return context;
+};
+
+// Auth Provider Component
+const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      // Verify token validity
+      const verifyToken = async () => {
+        try {
+          // You can add a /users/me endpoint to verify token
+          setLoading(false);
+        } catch (error) {
+          logout();
+          setLoading(false);
+        }
+      };
+      verifyToken();
+    } else {
+      setLoading(false);
+    }
+  }, [token]);
+
+  const login = (userData, accessToken) => {
+    setUser(userData);
+    setToken(accessToken);
+    localStorage.setItem('token', accessToken);
+    axios.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+  };
+
+  const logout = () => {
+    setUser(null);
+    setToken(null);
+    localStorage.removeItem('token');
+    delete axios.defaults.headers.common['Authorization'];
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+// Welcome/Landing Page
+const WelcomePage = ({ onNavigate }) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-red-50 to-yellow-50">
       {/* Navigation */}
@@ -20,23 +75,20 @@ const WelcomePage = ({ onGetStarted }) => {
             PromoGPT
           </span>
         </div>
-        <button
-          onClick={() => onGetStarted('login')}
-          className="px-6 py-2 bg-white border-2 border-orange-500 text-orange-600 rounded-lg font-semibold hover:bg-orange-50 transition"
-        >
+        <button onClick={() => onNavigate('login')} className="btn-secondary">
           Login
         </button>
       </nav>
 
       {/* Hero Section */}
-      <div className="max-w-6xl mx-auto px-6 py-20 text-center">
+      <div className="max-w-6xl mx-auto px-6 py-20 text-center animate-fade-in">
         <div className="mb-8">
           <span className="inline-block px-4 py-2 bg-orange-100 text-orange-800 rounded-full text-sm font-semibold mb-4">
             🇰🇪 Built for Kenyan SMEs
           </span>
         </div>
         
-        <h1 className="text-6xl font-black mb-6 bg-gradient-to-r from-orange-600 via-red-600 to-yellow-600 bg-clip-text text-transparent">
+        <h1 className="text-6xl font-black mb-6 bg-gradient-to-r from-orange-600 via-red-600 to-yellow-600 bg-clip-text text-transparent animate-slide-up">
           AI-Powered Marketing
           <br />
           for Your Business
@@ -47,32 +99,23 @@ const WelcomePage = ({ onGetStarted }) => {
           tailored for the Kenyan market.
         </p>
 
-        <button
-          onClick={() => onGetStarted('signup')}
-          className="px-8 py-4 bg-gradient-to-r from-orange-500 to-red-600 text-white text-xl font-bold rounded-xl hover:from-orange-600 hover:to-red-700 transition shadow-lg hover:shadow-xl transform hover:scale-105"
-        >
+        <button onClick={() => onNavigate('signup')} className="btn-primary text-xl">
           Get Started Free →
         </button>
 
         {/* Features */}
         <div className="grid md:grid-cols-3 gap-8 mt-20">
-          <div className="bg-white p-8 rounded-2xl shadow-lg">
-            <div className="text-4xl mb-4">📊</div>
-            <h3 className="text-xl font-bold mb-2 text-gray-800">Upload Your Data</h3>
-            <p className="text-gray-600">CSV files with sales, inventory, and customer data</p>
-          </div>
-          
-          <div className="bg-white p-8 rounded-2xl shadow-lg">
-            <div className="text-4xl mb-4">🤖</div>
-            <h3 className="text-xl font-bold mb-2 text-gray-800">AI Analysis</h3>
-            <p className="text-gray-600">Smart insights tailored for the Kenyan market</p>
-          </div>
-          
-          <div className="bg-white p-8 rounded-2xl shadow-lg">
-            <div className="text-4xl mb-4">🚀</div>
-            <h3 className="text-xl font-bold mb-2 text-gray-800">Launch Campaigns</h3>
-            <p className="text-gray-600">Ready-to-use content for social media and ads</p>
-          </div>
+          {[
+            { emoji: '📊', title: 'Upload Your Data', desc: 'CSV files with sales, inventory, and customer data' },
+            { emoji: '🤖', title: 'AI Analysis', desc: 'Smart insights tailored for the Kenyan market' },
+            { emoji: '🚀', title: 'Launch Campaigns', desc: 'Ready-to-use content for social media and ads' }
+          ].map((feature, idx) => (
+            <div key={idx} className="card animate-slide-up" style={{ animationDelay: `${idx * 0.1}s` }}>
+              <div className="text-4xl mb-4">{feature.emoji}</div>
+              <h3 className="text-xl font-bold mb-2 text-gray-800">{feature.title}</h3>
+              <p className="text-gray-600">{feature.desc}</p>
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -80,7 +123,8 @@ const WelcomePage = ({ onGetStarted }) => {
 };
 
 // Signup Page
-const SignupPage = ({ onBack, onSuccess }) => {
+const SignupPage = ({ onBack }) => {
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -98,10 +142,10 @@ const SignupPage = ({ onBack, onSuccess }) => {
     setLoading(true);
 
     try {
-      const response = await axios.post(`${API_BASE}/users/register/`, formData);
-      onSuccess(response.data);
+      const response = await axios.post('/users/register/', formData);
+      login(response.data.user, response.data.access);
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed. Please try again.');
+      setError(err.response?.data?.error || err.response?.data?.email?.[0] || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -109,7 +153,7 @@ const SignupPage = ({ onBack, onSuccess }) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md animate-fade-in">
         <div className="flex items-center justify-center mb-6">
           <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg flex items-center justify-center mr-3">
             <span className="text-3xl">🦁</span>
@@ -136,7 +180,7 @@ const SignupPage = ({ onBack, onSuccess }) => {
                 type="text"
                 value={formData.first_name}
                 onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                className="input-field"
                 required
               />
             </div>
@@ -146,7 +190,7 @@ const SignupPage = ({ onBack, onSuccess }) => {
                 type="text"
                 value={formData.last_name}
                 onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                className="input-field"
                 required
               />
             </div>
@@ -158,7 +202,7 @@ const SignupPage = ({ onBack, onSuccess }) => {
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              className="input-field"
               placeholder="you@example.com"
               required
             />
@@ -170,7 +214,7 @@ const SignupPage = ({ onBack, onSuccess }) => {
               type="tel"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              className="input-field"
               placeholder="+254 700 000 000"
               required
             />
@@ -182,7 +226,7 @@ const SignupPage = ({ onBack, onSuccess }) => {
               type="password"
               value={formData.password}
               onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              className="input-field"
               placeholder="••••••••"
               required
               minLength={8}
@@ -190,11 +234,7 @@ const SignupPage = ({ onBack, onSuccess }) => {
             <p className="text-xs text-gray-500 mt-1">Minimum 8 characters</p>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-orange-500 to-red-600 text-white py-3 rounded-lg font-semibold hover:from-orange-600 hover:to-red-700 transition disabled:opacity-50"
-          >
+          <button type="submit" disabled={loading} className="w-full btn-primary disabled:opacity-50">
             {loading ? 'Creating Account...' : 'Sign Up'}
           </button>
         </form>
@@ -211,7 +251,8 @@ const SignupPage = ({ onBack, onSuccess }) => {
 };
 
 // Login Page
-const LoginPage = ({ onBack, onSuccess }) => {
+const LoginPage = ({ onBack }) => {
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -223,8 +264,8 @@ const LoginPage = ({ onBack, onSuccess }) => {
     setLoading(true);
 
     try {
-      const response = await axios.post(`${API_BASE}/users/login/`, { email, password });
-      onSuccess(response.data);
+      const response = await axios.post('/users/login/', { email, password });
+      login(response.data.user, response.data.access);
     } catch (err) {
       setError('Invalid email or password. Please try again.');
     } finally {
@@ -234,7 +275,7 @@ const LoginPage = ({ onBack, onSuccess }) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md animate-fade-in">
         <div className="flex items-center justify-center mb-6">
           <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg flex items-center justify-center mr-3">
             <span className="text-3xl">🦁</span>
@@ -260,7 +301,7 @@ const LoginPage = ({ onBack, onSuccess }) => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              className="input-field"
               placeholder="you@example.com"
               required
             />
@@ -272,17 +313,13 @@ const LoginPage = ({ onBack, onSuccess }) => {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              className="input-field"
               placeholder="••••••••"
               required
             />
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-gradient-to-r from-orange-500 to-red-600 text-white py-3 rounded-lg font-semibold hover:from-orange-600 hover:to-red-700 transition disabled:opacity-50"
-          >
+          <button type="submit" disabled={loading} className="w-full btn-primary disabled:opacity-50">
             {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
@@ -298,38 +335,9 @@ const LoginPage = ({ onBack, onSuccess }) => {
   );
 };
 
-// Dashboard Component (continues in next message due to length...)
-
-export default function App() {
-  const [page, setPage] = useState('welcome'); // 'welcome', 'signup', 'login', 'dashboard'
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
-
-  const handleAuthSuccess = (data) => {
-    setUser(data.user);
-    setToken(data.access);
-    setPage('dashboard');
-  };
-
-  const handleLogout = () => {
-    setUser(null);
-    setToken(null);
-    setPage('welcome');
-  };
-
-  return (
-    <AuthContext.Provider value={{ user, token, logout: handleLogout }}>
-      {page === 'welcome' && <WelcomePage onGetStarted={setPage} />}
-      {page === 'signup' && <SignupPage onBack={setPage} onSuccess={handleAuthSuccess} />}
-      {page === 'login' && <LoginPage onBack={setPage} onSuccess={handleAuthSuccess} />}
-      {page === 'dashboard' && <Dashboard />}
-    </AuthContext.Provider>
-  );
-}
-
 // Dashboard Component
 const Dashboard = () => {
-  const { user, token, logout } = useContext(AuthContext);
+  const { user, logout } = useAuth();
   const [activeTab, setActiveTab] = useState('upload');
 
   return (
@@ -349,10 +357,7 @@ const Dashboard = () => {
             <span className="text-sm text-gray-600">
               Welcome, <span className="font-medium text-gray-800">{user?.first_name}</span>
             </span>
-            <button
-              onClick={logout}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition font-medium text-sm"
-            >
+            <button onClick={logout} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition font-medium text-sm">
               Logout
             </button>
           </div>
@@ -363,37 +368,34 @@ const Dashboard = () => {
       <main className="max-w-7xl mx-auto px-6 py-8">
         {/* Tabs */}
         <div className="flex space-x-4 mb-8 border-b border-gray-200">
-          <button
-            onClick={() => setActiveTab('upload')}
-            className={`px-6 py-3 font-semibold transition ${
-              activeTab === 'upload'
-                ? 'text-orange-600 border-b-2 border-orange-600'
-                : 'text-gray-600 hover:text-gray-800'
-            }`}
-          >
-            📤 Upload Data
-          </button>
-          <button
-            onClick={() => setActiveTab('campaigns')}
-            className={`px-6 py-3 font-semibold transition ${
-              activeTab === 'campaigns'
-                ? 'text-orange-600 border-b-2 border-orange-600'
-                : 'text-gray-600 hover:text-gray-800'
-            }`}
-          >
-            🚀 Campaigns
-          </button>
+          {[
+            { id: 'upload', icon: '📤', label: 'Upload Data' },
+            { id: 'campaigns', icon: '🚀', label: 'Campaigns' }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-6 py-3 font-semibold transition ${
+                activeTab === tab.id
+                  ? 'text-orange-600 border-b-2 border-orange-600'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              {tab.icon} {tab.label}
+            </button>
+          ))}
         </div>
 
-        {activeTab === 'upload' && <UploadSection token={token} />}
-        {activeTab === 'campaigns' && <CampaignsSection token={token} />}
+        {activeTab === 'upload' && <UploadSection />}
+        {activeTab === 'campaigns' && <CampaignsSection />}
       </main>
     </div>
   );
 };
 
-// Upload Section Component
-const UploadSection = ({ token }) => {
+// Upload Section
+const UploadSection = () => {
+  const { token } = useAuth();
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -411,34 +413,27 @@ const UploadSection = ({ token }) => {
     setMessage({ type: '', text: '' });
 
     try {
-      await axios.post(`${API_BASE}/business/demo-business/products/upload/`, formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      setMessage({ type: 'success', text: 'Upload successful!' });
+      await axios.post('/business/demo-business/products/upload/', formData);
+      setMessage({ type: 'success', text: 'Upload successful! Your data is being processed.' });
       setFile(null);
     } catch (err) {
-      setMessage({ type: 'error', text: 'Upload failed. Please try again.' });
+      setMessage({ type: 'error', text: err.response?.data?.error || 'Upload failed. Please try again.' });
     } finally {
       setUploading(false);
     }
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+    <div className="card animate-fade-in">
       <h2 className="text-2xl font-bold text-gray-800 mb-4">Upload Your Business Data</h2>
       <p className="text-gray-600 mb-6">Upload CSV files with your sales, inventory, or customer data</p>
 
       {message.text && (
-        <div
-          className={`mb-6 px-4 py-3 rounded-lg ${
-            message.type === 'success'
-              ? 'bg-green-50 border border-green-200 text-green-700'
-              : 'bg-red-50 border border-red-200 text-red-700'
-          }`}
-        >
+        <div className={`mb-6 px-4 py-3 rounded-lg ${
+          message.type === 'success'
+            ? 'bg-green-50 border border-green-200 text-green-700'
+            : 'bg-red-50 border border-red-200 text-red-700'
+        }`}>
           {message.text}
         </div>
       )}
@@ -471,7 +466,7 @@ const UploadSection = ({ token }) => {
       <button
         onClick={handleUpload}
         disabled={!file || uploading}
-        className="w-full mt-6 bg-gradient-to-r from-orange-500 to-red-600 text-white py-3 rounded-lg font-semibold hover:from-orange-600 hover:to-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full mt-6 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {uploading ? 'Uploading...' : 'Upload CSV'}
       </button>
@@ -479,17 +474,62 @@ const UploadSection = ({ token }) => {
   );
 };
 
-// Campaigns Section Component
-const CampaignsSection = ({ token }) => {
+// Campaigns Section
+const CampaignsSection = () => {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+    <div className="card animate-fade-in">
       <h2 className="text-2xl font-bold text-gray-800 mb-4">Your Campaigns</h2>
       <p className="text-gray-600 mb-6">AI-generated marketing campaigns will appear here</p>
       
       <div className="text-center py-12">
         <div className="text-6xl mb-4">🚀</div>
         <p className="text-gray-500">Upload your data to generate campaigns</p>
+        <p className="text-sm text-gray-400 mt-2">AI campaign generation coming soon!</p>
       </div>
     </div>
+  );
+};
+
+// Main App Component
+export default function App() {
+  const [page, setPage] = useState('welcome');
+
+  return (
+    <AuthProvider>
+      <AppRouter page={page} setPage={setPage} />
+    </AuthProvider>
+  );
+}
+
+// Router Component
+const AppRouter = ({ page, setPage }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-red-50">
+        <div className="text-center">
+          <div className="text-6xl mb-4">🦁</div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Auto-redirect to dashboard if logged in
+  if (user && page !== 'dashboard') {
+    setPage('dashboard');
+  }
+
+  if (user) {
+    return <Dashboard />;
+  }
+
+  return (
+    <>
+      {page === 'welcome' && <WelcomePage onNavigate={setPage} />}
+      {page === 'signup' && <SignupPage onBack={setPage} />}
+      {page === 'login' && <LoginPage onBack={setPage} />}
+    </>
   );
 };
