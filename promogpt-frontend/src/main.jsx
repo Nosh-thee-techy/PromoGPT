@@ -5,8 +5,10 @@ import { AuthProvider } from './AuthContext.jsx';
 import { Provider } from './redux/react-redux.js';
 import { store } from './store.js'; // Path to your Redux store
 import { QueryClient, QueryClientProvider } from 'react-query';
-
 import 'bootstrap/dist/css/bootstrap.min.css';
+import 'bootstrap/dist/js/bootstrap.bundle.min.js';
+import './index.css';
+
 
 const queryClient = new QueryClient();
 
