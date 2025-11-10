@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import { AuthProvider } from './AuthContext.jsx';
-import { Provider } from 'react-redux';
+import { Provider } from './redux/react-redux.js';
 import { store } from './store.js'; // Path to your Redux store
 import { QueryClient, QueryClientProvider } from 'react-query';
 
