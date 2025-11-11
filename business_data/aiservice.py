@@ -16,29 +16,41 @@ class CampaignGenerator:
     def analyze_products(self):
         """Analyze product data"""
         products = Product.objects.filter(business=self.business)
-        
+
+        if not products.exists():
+            return {
+                'total_products': 0,
+                'categories': [],
+                'price_range': {'min': 0, 'max': 0},
+                'top_products': [],
+            }
+
         analysis = {
             'total_products': products.count(),
-            'categories': list(products.values_list('category', flat=True).distinct()),
+            'categories': list(
+                products.exclude(category='').values_list('category', flat=True).distinct()
+            ),
             'price_range': {
-                'min': products.order_by('price').first().price if products.exists() else 0,
-                'max': products.order_by('-price').first().price if products.exists() else 0,
+                'min': products.order_by('price').first().price,
+                'max': products.order_by('-price').first().price,
             },
-            'top_products': list(products.order_by('-price')[:5].values('name', 'price', 'category'))
+            'top_products': list(
+                products.order_by('-price')[:5].values('name', 'price', 'category')
+            )
         }
-        
+
         return analysis
 
     def analyze_sales(self):
         """Analyze sales data"""
         sales = SalesRecord.objects.filter(business=self.business)
-        
+
         if not sales.exists():
             return {'total_sales': 0, 'total_revenue': 0, 'trends': []}
-        
+
         total_revenue = sum(sale.revenue for sale in sales)
         total_quantity = sum(sale.quantity for sale in sales)
-        
+
         # Get top selling products
         top_products = {}
         for sale in sales:
@@ -47,251 +59,209 @@ class CampaignGenerator:
                 top_products[product_name] = {'quantity': 0, 'revenue': 0}
             top_products[product_name]['quantity'] += sale.quantity
             top_products[product_name]['revenue'] += sale.revenue
-        
+
         top_selling = sorted(
             top_products.items(),
             key=lambda x: x[1]['quantity'],
             reverse=True
         )[:5]
-        
+
         return {
-            'total_sales': sales.count(),
+            'total_sales': total_quantity,
             'total_revenue': total_revenue,
-            'total_quantity': total_quantity,
-            'average_order_value': total_revenue / sales.count() if sales.count() > 0 else 0,
-            'top_selling': [{'name': name, **data} for name, data in top_selling]
+            'top_selling': [
+                {'product': name, **stats} for name, stats in top_selling
+            ]
         }
 
-    def generate_campaign(self, goal, budget):
-        """Generate a marketing campaign"""
+    def generate_campaign(self, goal='Increase sales', budget=50000):
+        """Generate a marketing campaign based on business data"""
         product_analysis = self.analyze_products()
         sales_analysis = self.analyze_sales()
-        
-        # Simple template-based generation (replace with AI API call)
-        campaign = {
-            'goal': goal,
-            'budget': budget,
-            'business_name': self.business.name,
-            'industry': self.business.industry,
-            'summary': self._generate_summary(product_analysis, sales_analysis, goal, budget),
-            'social_posts': self._generate_social_posts(product_analysis, sales_analysis),
-            'ad_copy': self._generate_ad_copy(product_analysis, sales_analysis, budget),
-            'campaign_calendar': self._generate_calendar(),
-            'insights': self._generate_insights(product_analysis, sales_analysis),
-        }
-        
-        return campaign
 
-    def _generate_summary(self, products, sales, goal, budget):
-        """Generate campaign summary"""
-        top_product = products['top_products'][0]['name'] if products['top_products'] else 'your products'
-        
-        return f"""
-🎯 Campaign Overview for {self.business.name}
+        # Generate campaign summary
+        summary = f"""
+Campaign Goal: {goal}
+Budget: KSh {budget:,.2f}
 
-Goal: {goal}
-Budget: KSh {budget:,.0f}
-Industry: {self.business.industry}
+Business Analysis:
+- Total Products: {product_analysis['total_products']}
+- Categories: {', '.join(product_analysis['categories']) or 'None'}
+- Price Range: KSh {product_analysis['price_range']['min']:,.2f} - KSh {product_analysis['price_range']['max']:,.2f}
+- Total Sales: {sales_analysis['total_sales']} units
+- Total Revenue: KSh {sales_analysis['total_revenue']:,.2f}
 
-Based on your data analysis:
-- You have {products['total_products']} products across {len(products['categories'])} categories
-- Your top-selling product is {top_product}
-- Total revenue: KSh {sales.get('total_revenue', 0):,.0f}
+Top Selling Products:
+{self._format_top_products(sales_analysis.get('top_selling', []))}
 
-This campaign is designed to maximize your reach in the Kenyan market with culturally relevant content.
+Recommended Actions:
+1. Focus on top-performing products
+2. Create targeted social media campaigns
+3. Offer promotions on high-margin items
+4. Leverage WhatsApp for customer engagement
 """
 
-    def _generate_social_posts(self, products, sales):
-        """Generate social media posts"""
-        business_name = self.business.name
+        # Generate social media posts
+        social_posts = self._generate_social_posts(product_analysis, sales_analysis, goal)
+
+        # Generate ad copy
+        ad_copy = self._generate_ad_copy(product_analysis, sales_analysis, budget)
+
+        # Generate campaign calendar
+        calendar = self._generate_calendar()
+
+        # Generate insights
+        insights = self._generate_insights(product_analysis, sales_analysis)
+
+        return {
+            'summary': summary,
+            'social_posts': social_posts,
+            'ad_copy': ad_copy,
+            'campaign_calendar': calendar,
+            'insights': insights,
+            'product_analysis': product_analysis,
+            'sales_analysis': sales_analysis,
+        }
+
+    def _format_top_products(self, top_selling):
+        """Format top selling products for display"""
+        if not top_selling:
+            return "No sales data available yet"
         
-        posts = [
-            {
-                'platform': 'Facebook & Instagram',
-                'type': 'Product Showcase',
-                'content': f"""🔥 Exclusive Deal Alert! 🔥
+        lines = []
+        for item in top_selling:
+            lines.append(
+                f"- {item['product']}: {item['quantity']} units, KSh {item['revenue']:,.2f}"
+            )
+        return '\n'.join(lines)
 
-{business_name} brings you quality products at unbeatable prices!
-
-✨ Limited time offer - Don't miss out!
-📍 Visit us today or order online
-💰 Special discounts for our loyal customers
-
-Tag a friend who needs to see this! 👇
-
-#{business_name.replace(' ', '')} #KenyanBusiness #QualityProducts #NairobiShopping""",
-                'image_suggestions': 'Product collage with vibrant colors, include price tags'
-            },
-            {
-                'platform': 'WhatsApp Status',
-                'type': 'Quick Update',
-                'content': f"""💚 {business_name} 💚
-
-Special offer this week only! 
-
-Message us to order:
-☎️ [Your Number]
-
-Quick delivery across Nairobi!""",
-                'image_suggestions': 'Simple product image with price'
-            },
-            {
-                'platform': 'Twitter/X',
-                'type': 'Engagement',
-                'content': f"""🎉 GIVEAWAY ALERT! 🎉
-
-Win amazing products from {business_name}! 
-
-To enter:
-✅ Follow us
-✅ RT this tweet
-✅ Tag 3 friends
-
-Winner announced Friday! 🇰🇪
-
-#KenyanTwitter #Giveaway #{business_name.replace(' ', '')}""",
-                'image_suggestions': 'Eye-catching giveaway graphic'
-            },
-            {
-                'platform': 'Instagram Stories',
-                'type': 'Behind the Scenes',
-                'content': f"""📸 Behind the scenes at {business_name}!
-
-Swipe up to see how we ensure quality for our customers
-
-[Interactive poll]: What product do you want to see next?
-
-🛒 Shop via link in bio!""",
-                'image_suggestions': 'Authentic behind-the-scenes photos/videos'
-            },
-            {
-                'platform': 'Facebook',
-                'type': 'Customer Testimonial',
-                'content': f"""⭐⭐⭐⭐⭐ 5-Star Review!
-
-"I've been buying from {business_name} for months now. Quality products, great prices, and fast delivery. Highly recommend!" - Happy Customer
-
-Join hundreds of satisfied customers across Kenya!
-
-🛍️ Order now: [Your Contact]
-
-#{business_name.replace(' ', '')} #CustomerFirst #TrustedBrand""",
-                'image_suggestions': 'Customer testimonial graphic with stars'
-            }
-        ]
+    def _generate_social_posts(self, products, sales, goal):
+        """Generate social media post suggestions"""
+        posts = []
         
+        # Instagram post
+        posts.append({
+            'platform': 'Instagram',
+            'content': f"🛍️ Special offer alert! Shop our top products and enjoy amazing deals. Limited time only! #ShopLocal #Kenya #{self.business.name.replace(' ', '')}"
+        })
+
+        # Twitter post
+        posts.append({
+            'platform': 'Twitter/X',
+            'content': f"🔥 Don't miss out! We're offering incredible deals on our best-selling products. DM us to order! #{self.business.name.replace(' ', '')} #Nairobi"
+        })
+
+        # Facebook post
+        posts.append({
+            'platform': 'Facebook',
+            'content': f"Hi everyone! 👋 We have exciting new offers just for you. Check out our {', '.join(products.get('categories', ['products'])[:2])} and more. Contact us today!"
+        })
+
+        # WhatsApp message template
+        posts.append({
+            'platform': 'WhatsApp',
+            'content': f"Hello! 👋 We have special offers on {', '.join([p['name'] for p in products.get('top_products', [])[:3]])}. Reply YES to learn more!"
+        })
+
         return posts
 
     def _generate_ad_copy(self, products, sales, budget):
-        """Generate advertising copy"""
-        business_name = self.business.name
-        
-        ads = [
-            {
-                'platform': 'Facebook Ads',
-                'type': 'Carousel Ad',
-                'headline': f'Shop Quality at {business_name}',
-                'primary_text': f"""Discover amazing deals on quality products! 
+        """Generate advertising copy suggestions"""
+        ads = []
 
-🎁 Special offers for new customers
-🚚 Fast delivery across Kenya
-💯 100% genuine products
+        # Facebook/Instagram Ad
+        ads.append({
+            'platform': 'Facebook/Instagram Ads',
+            'headline': f"Shop Quality {products.get('categories', ['Products'])[0] if products.get('categories') else 'Products'} in Kenya",
+            'primary_text': f"Discover amazing deals at {self.business.name}! We offer the best {', '.join(products.get('categories', ['products'])[:2])} at unbeatable prices. Order now and get fast delivery across Nairobi!",
+            'cta': 'Shop Now',
+            'budget_allocation': f"KSh {budget * 0.6:,.2f} (60%)"
+        })
 
-Click to browse our collection!""",
-                'call_to_action': 'Shop Now',
-                'targeting': 'Age 25-45, Nairobi & major cities, Interest: Shopping, Online shopping',
-                'budget_suggestion': f'KSh {budget * 0.4:,.0f} (40% of budget)',
-            },
-            {
-                'platform': 'Instagram Ads',
-                'type': 'Story Ad',
-                'headline': f'{business_name} - Your Trusted Store',
-                'primary_text': f"""Limited time offer! 🔥
+        # Google Ads
+        ads.append({
+            'platform': 'Google Ads',
+            'headline': f"Buy {products.get('categories', ['Products'])[0] if products.get('categories') else 'Quality Products'} | {self.business.name}",
+            'description': f"Best prices on {', '.join(products.get('categories', ['products'])[:2])}. Fast delivery. Order today!",
+            'budget_allocation': f"KSh {budget * 0.4:,.2f} (40%)"
+        })
 
-Tap to see our latest collection
-
-Free delivery on orders over KSh 1,000!""",
-                'call_to_action': 'Learn More',
-                'targeting': 'Age 18-35, Urban Kenya, Interest: Fashion, Lifestyle, Shopping',
-                'budget_suggestion': f'KSh {budget * 0.3:,.0f} (30% of budget)',
-            },
-            {
-                'platform': 'Google Ads',
-                'type': 'Search Ad',
-                'headline': f'Buy Quality Products - {business_name}',
-                'description': f'Trusted by thousands of Kenyans. Great prices, fast delivery. Order online today!',
-                'keywords': f'{self.business.industry} Kenya, buy online Nairobi, quality products Kenya',
-                'budget_suggestion': f'KSh {budget * 0.3:,.0f} (30% of budget)',
-            }
-        ]
-        
         return ads
 
     def _generate_calendar(self):
-        """Generate a content calendar"""
-        today = datetime.now()
+        """Generate a campaign calendar"""
         calendar = []
-        
-        # Generate 2-week schedule
-        for i in range(14):
-            date = today + timedelta(days=i)
-            day_name = date.strftime('%A')
-            
-            if day_name in ['Monday', 'Wednesday', 'Friday']:
-                content_type = 'Product Post'
-            elif day_name in ['Tuesday', 'Thursday']:
-                content_type = 'Engagement Post'
-            elif day_name == 'Saturday':
-                content_type = 'Weekend Special'
-            else:  # Sunday
-                content_type = 'Customer Testimonial'
-            
-            calendar.append({
-                'date': date.strftime('%Y-%m-%d'),
-                'day': day_name,
-                'content_type': content_type,
-                'platform': 'Facebook, Instagram, Twitter',
-                'time': '10:00 AM, 4:00 PM' if day_name != 'Sunday' else '2:00 PM'
-            })
-        
+        start_date = datetime.now()
+
+        # Week 1: Launch
+        calendar.append({
+            'week': 1,
+            'date': start_date.strftime('%Y-%m-%d'),
+            'content_type': 'Social Media Teaser',
+            'platform': 'Instagram, Facebook',
+            'time': '10:00 AM'
+        })
+
+        # Week 2: Engagement
+        calendar.append({
+            'week': 2,
+            'date': (start_date + timedelta(days=7)).strftime('%Y-%m-%d'),
+            'content_type': 'Product Showcase',
+            'platform': 'WhatsApp, Instagram Stories',
+            'time': '2:00 PM'
+        })
+
+        # Week 3: Promotion
+        calendar.append({
+            'week': 3,
+            'date': (start_date + timedelta(days=14)).strftime('%Y-%m-%d'),
+            'content_type': 'Special Offer',
+            'platform': 'All Channels',
+            'time': '12:00 PM'
+        })
+
+        # Week 4: Closing
+        calendar.append({
+            'week': 4,
+            'date': (start_date + timedelta(days=21)).strftime('%Y-%m-%d'),
+            'content_type': 'Last Chance',
+            'platform': 'WhatsApp Broadcast, SMS',
+            'time': '9:00 AM'
+        })
+
         return calendar
 
     def _generate_insights(self, products, sales):
-        """Generate business insights"""
+        """Generate marketing insights"""
         insights = []
-        
-        if products['total_products'] < 10:
+
+        # Product insights
+        if products['total_products'] > 0:
             insights.append({
-                'type': 'opportunity',
-                'title': 'Expand Your Product Range',
-                'message': 'Consider adding more products to give customers more choices.'
+                'title': 'Product Diversity',
+                'message': f"You have {products['total_products']} products across {len(products['categories'])} categories. Consider cross-selling related items."
             })
-        
-        if sales.get('total_revenue', 0) > 100000:
+
+        # Sales insights
+        if sales['total_sales'] > 0:
+            avg_order = sales['total_revenue'] / sales['total_sales']
             insights.append({
-                'type': 'success',
-                'title': 'Strong Sales Performance',
-                'message': f"You've generated KSh {sales['total_revenue']:,.0f} in revenue. Keep up the momentum!"
+                'title': 'Average Order Value',
+                'message': f"Your average order value is KSh {avg_order:,.2f}. Try bundling products to increase this metric."
             })
-        
+
+        # Top product insight
         if sales.get('top_selling'):
-            top_product = sales['top_selling'][0]['name']
+            top_product = sales['top_selling'][0]
             insights.append({
-                'type': 'recommendation',
-                'title': 'Focus on Best Sellers',
-                'message': f'"{top_product}" is your top seller. Consider creating more content around this product.'
+                'title': 'Star Product',
+                'message': f"{top_product['product']} is your best seller! Feature it prominently in your campaigns."
             })
-        
+
+        # Market insight
         insights.append({
-            'type': 'tip',
-            'title': 'Leverage WhatsApp',
-            'message': 'WhatsApp is huge in Kenya. Share your campaigns via WhatsApp Status and groups.'
+            'title': 'Kenyan Market Timing',
+            'message': "Launch campaigns after payday (1st-5th and 25th-30th of the month) for better engagement in the Kenyan market."
         })
-        
-        insights.append({
-            'type': 'tip',
-            'title': 'Mobile-First Strategy',
-            'message': 'Most Kenyans access social media via mobile. Ensure all your content is mobile-optimized.'
-        })
-        
+
         return insights
