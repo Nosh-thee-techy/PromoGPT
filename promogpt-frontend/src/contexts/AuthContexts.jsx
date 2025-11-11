@@ -19,7 +19,7 @@ export const AuthProvider = ({ children }) => {
     if (token) {
       api.defaults.headers.common.Authorization = `Bearer ${token}`;
       // Optionally: verify token by requesting /users/me
-      ;(async () => {
+      (async () => {
         try {
           const res = await api.get("/users/me/");
           setUser(res.data);

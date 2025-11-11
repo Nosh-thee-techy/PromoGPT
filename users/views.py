@@ -1,6 +1,6 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status,permissions
+from rest_framework import status, permissions
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
@@ -8,56 +8,53 @@ from django.utils.encoding import force_str, smart_bytes
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.core.mail import send_mail
 from django.conf import settings
-
 from django.contrib.auth.hashers import make_password
-from .models import User
 
+from .models import User, Business, BusinessMember
+from .serializers import RegisterSerializer, UserSerializer, BusinessSerializer
 
-from .models import Business,BusinessMember
-from .serializers import RegisterSerializer,Userserializer,BusinessSerializer
 
 class RegisterView(APIView):
-    permission_classes=[permissions.AllowAny]
+    permission_classes = [permissions.AllowAny]
 
-    def post(self,request):
-        serializer=RegisterSerializer(data=request.data)
+    def post(self, request):
+        serializer = RegisterSerializer(data=request.data)
         if serializer.is_valid():
-            user=serializer.save()
-            refresh=RefreshToken.for_user(user)
+            user = serializer.save()
+            refresh = RefreshToken.for_user(user)
             return Response({
-                'user':Userserializer(user).data,
-                "refresh":str(refresh),
-                'access':str(refresh.access_token),
+                'user': UserSerializer(user).data,
+                "refresh": str(refresh),
+                'access': str(refresh.access_token),
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-            },stats=status.HTTP_201_CREATED)
-        return Response(serializer.errors,status=status.HTTP_400_BAD_REQUEST)
-    
 
 class LoginView(APIView):
-    permission_classes=[permissions.AllowAny]
+    permission_classes = [permissions.AllowAny]
 
-    def post(self,request):
-        user=authenticate(
+    def post(self, request):
+        user = authenticate(
             email=request.data.get("email"),
             password=request.data.get('password')
         )
 
         if not user:
-            return Response({"error":"Invalid credentials"},status=status.HTTP_401_UNAUTHORIZED)
-        
-        refresh=RefreshToken.for_user(user)
+            return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        refresh = RefreshToken.for_user(user)
         return Response({
-            'user':Userserializer(user).data,
-            'refresh':str(refresh),
-            'access':str(refresh.access_token)
+            'user': UserSerializer(user).data,
+            'refresh': str(refresh),
+            'access': str(refresh.access_token)
         })
-    
+
 
 class LogoutView(APIView):
-    def post(self,request):
-        refresh_token=request.data.get("refresh")
+    def post(self, request):
+        refresh_token = request.data.get("refresh")
         if not refresh_token:
-            return Response({"error":"Refresh token required"},status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Refresh token required"}, status=status.HTTP_400_BAD_REQUEST)
         try:
             RefreshToken(refresh_token).blacklist()
             return Response({"message": "Logged out successfully"}, status=status.HTTP_205_RESET_CONTENT)
@@ -79,8 +76,6 @@ class BusinessListView(APIView):
     def get(self, request):
         businesses = Business.objects.filter(owner=request.user)
         return Response(BusinessSerializer(businesses, many=True).data)
-        
-        
 
 
 class PasswordResetRequestView(APIView):
@@ -89,7 +84,7 @@ class PasswordResetRequestView(APIView):
     def post(self, request):
         email = request.data.get("email")
         user = User.objects.filter(email=email).first()
-        
+
         # Response should be same for both existence and non-existence of user
         # to prevent attackers confirming valid emails
         if user:
@@ -133,5 +128,3 @@ class PasswordResetConfirmView(APIView):
         user.save()
 
         return Response({"message": "Password reset successful!"})
-
-    

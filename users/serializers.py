@@ -1,10 +1,12 @@
 from rest_framework import serializers
 from .models import User, Business
 
+
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ("id", "email", "first_name", "last_name", "phone", "role", "is_verified")
+
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
@@ -19,6 +21,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.set_password(password)
         user.save()
         return user
+
 
 class BusinessSerializer(serializers.ModelSerializer):
     class Meta:
