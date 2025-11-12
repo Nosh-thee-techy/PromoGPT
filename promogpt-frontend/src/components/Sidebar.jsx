@@ -1,39 +1,52 @@
 // src/components/Sidebar.jsx
 import React from "react";
-import { Link, useLocation } from "react-router-dom";
-import { FiHome, FiFileText, FiUser, FiPackage, FiBarChart2, FiSettings, FiBook } from "react-icons/fi";
+import { NavLink } from "react-router-dom";
+import { FiHome, FiZap, FiSave, FiUser, FiLogOut, FiMenu } from "react-icons/fi";
+import BrandMark from "./BrandMark";
+import { useAuth } from "../contexts/AuthContext";
 
-export default function Sidebar() {
-  const { pathname } = useLocation();
+export default function Sidebar({ collapsed, onToggle }) {
+  const { logout } = useAuth();
 
   const links = [
-    { to: "/dashboard", label: "Dashboard", icon: <FiHome /> },
-    { to: "/dashboard/campaign", label: "Campaigns", icon: <FiFileText /> },
-    { to: "/dashboard/generate", label: "AI Generator", icon: <FiBarChart2 /> },
-    { to: "/dashboard/saved", label: "Saved Posts", icon: <FiBook /> },
-    { to: "/dashboard/products", label: "Products", icon: <FiPackage /> },
-    { to: "/dashboard/ledger", label: "Ledger", icon: <FiBarChart2 /> },
+    { to: "/dashboard", label: "Home", icon: <FiHome /> },
+    { to: "/dashboard/create", label: "Create", icon: <FiZap /> },
+    { to: "/dashboard/saved", label: "Saved", icon: <FiSave /> },
     { to: "/dashboard/profile", label: "Profile", icon: <FiUser /> },
-    { to: "/dashboard/support", label: "Support", icon: <FiSettings /> },
   ];
 
   return (
-    <aside className="sidebar bg-gray-900 text-white h-screen p-6 w-64 fixed">
-      <div className="text-2xl font-bold mb-8">PromoGPT</div>
-      <nav className="space-y-3">
-        {links.map(({ to, label, icon }) => (
-          <Link
-            key={to}
-            to={to}
-            className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${
-              pathname === to ? "bg-blue-600" : "hover:bg-gray-700"
-            }`}
+    <aside className={`sidebar ${collapsed ? "is-collapsed" : ""}`}>
+      <div className="sidebar__top">
+        <div className="sidebar__brand">
+          <BrandMark size="sm" />
+        </div>
+        <button className="sidebar__toggle" onClick={onToggle} aria-label="Toggle menu">
+          <FiMenu />
+        </button>
+      </div>
+
+      <nav className="sidebar__nav" aria-label="Main navigation">
+        {links.map((l) => (
+          <NavLink
+            key={l.to}
+            to={l.to}
+            end
+            className={({ isActive }) => `sidebar__link ${isActive ? "is-active" : ""}`}
+            title={l.label}
           >
-            {icon}
-            <span>{label}</span>
-          </Link>
+            <span className="sidebar__icon">{l.icon}</span>
+            {!collapsed && <span className="sidebar__label">{l.label}</span>}
+          </NavLink>
         ))}
       </nav>
+
+      <div className="sidebar__bottom">
+        <button className="sidebar__logout" onClick={logout}>
+          <span className="sidebar__icon"><FiLogOut /></span>
+          {!collapsed && <span className="sidebar__label">Logout</span>}
+        </button>
+      </div>
     </aside>
   );
 }
