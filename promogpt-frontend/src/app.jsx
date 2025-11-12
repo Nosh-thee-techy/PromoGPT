@@ -1,55 +1,42 @@
 // src/App.jsx
 import React from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { Routes, Route } from "react-router-dom";
+import { AuthProvider } from "./contexts/AuthContext";
+import DashboardLayout from "./layouts/DashboardLayout";
 
-import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import Onboarding from "./pages/Onboarding";
 
-import DashboardLayout from "./layouts/DashboardLayout";
 import DashboardHome from "./pages/dashboard/DashboardHome";
+import Campaign from "./pages/dashboard/Campaign";
 import CreateContent from "./pages/dashboard/CreateContent";
 import SavedPosts from "./pages/dashboard/SavedPosts";
+import Products from "./pages/dashboard/Products";
+import Ledger from "./pages/dashboard/Ledger";
 import BusinessProfile from "./pages/dashboard/BusinessProfile";
-
-// protect logged-in pages
-function PrivateRoute({ children }) {
-  const { user } = useAuth();
-  return user ? children : <Navigate to="/login" replace />;
-}
+import Support from "./pages/dashboard/Support";
 
 export default function App() {
   return (
     <AuthProvider>
-      <Router>
-        <Routes>
-          
-          {/* Public Routes */}
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
+      <Routes>
+        <Route path="/" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/onboarding" element={<Onboarding />} />
 
-          {/* Protected Dashboard */}
-          <Route
-            path="/dashboard/*"
-            element={
-              <PrivateRoute>
-                <DashboardLayout />
-              </PrivateRoute>
-            }
-          >
-            <Route index element={<DashboardHome />} />
-            <Route path="create" element={<CreateContent />} />
-            <Route path="saved" element={<SavedPosts />} />
-            <Route path="profile" element={<BusinessProfile />} />
-          </Route>
-
-          {/* Fallback → Home */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-
-        </Routes>
-      </Router>
+        {/* Dashboard Layout */}
+        <Route element={<DashboardLayout />}>
+          <Route path="/dashboard" element={<DashboardHome />} />
+          <Route path="/dashboard/campaign" element={<Campaign />} />
+          <Route path="/dashboard/generate" element={<CreateContent />} />
+          <Route path="/dashboard/saved" element={<SavedPosts />} />
+          <Route path="/dashboard/products" element={<Products />} />
+          <Route path="/dashboard/ledger" element={<Ledger />} />
+          <Route path="/dashboard/profile" element={<BusinessProfile />} />
+          <Route path="/dashboard/support" element={<Support />} />
+        </Route>
+      </Routes>
     </AuthProvider>
   );
 }

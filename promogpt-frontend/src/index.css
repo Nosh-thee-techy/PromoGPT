@@ -316,3 +316,28 @@ input {
   .sidebar.is-collapsed { transform: translateX(-100%); width: 0; }
   .dashboard__content { padding: 16px; margin-left: 0 !important; }
 }
+
+/* index.css snippet */
+html.dark {
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+html.dark .card {
+  background-color: #1e293b;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+}
+html.dark .navbar {
+  background-color: #111827;
+}
+html.dark .footer { 
+  background-color: #111827;
+}
+html.dark input {
+  background-color: #1e293b;
+  border: 1px solid #334155;
+  color: #e2e8f0;
+}
+html.dark .btn--ghost {
+  border: 1px solid #334155;
+  color: #e2e8f0;
+}
